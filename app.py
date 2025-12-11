@@ -38,23 +38,55 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# 新增：图像上传功能
+uploaded_file = st.file_uploader("上传 TradingView 图表截图分析？（可选）", type=["png", "jpg", "jpeg", "webp"])
+
 # 用户输入
-if prompt := st.chat_input("问 ST2U、股票、销售技巧？"):
-    # 添加用户消息
-    st.session_state.messages.append({"role": "user", "content": prompt})
+prompt = st.chat_input("问 ST2U、股票、销售技巧？或直接上传截图分析")
+
+if prompt or uploaded_file:
+    # 构建用户消息
+    user_content = []
+    
+    if prompt:
+        user_content.append({"type": "text", "text": prompt})
+    
+    if uploaded_file is not None:
+        # 显示上传的图像
+        st.image(uploaded_file, caption="你上传的图表", use_column_width=True)
+        # 将图像转 base64 发送给 Assistant
+        bytes_data = uploaded_file.getvalue()
+        user_content.append({
+            "type": "image_file",
+            "image_file": {
+                "file_data": {
+                    "mime_type": uploaded_file.type,
+                    "data": bytes_data.hex()
+                }
+            }
+        })
+        # 自动加提示
+        if not prompt:
+            prompt = "分析这张图表截图，用我的密集型资金攻略解释 P1/P2/V7/V10 和资金标签"
+
+    # 添加用户消息到历史
+    st.session_state.messages.append({"role": "user", "content": prompt or "（上传了图表截图）"})
     with st.chat_message("user"):
-        st.markdown(prompt)
+        if prompt:
+            st.markdown(prompt)
+        if uploaded_file:
+            st.image(uploaded_file, caption="你上传的图表", use_column_width=True)
 
     # 发送给 Assistant
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         with st.spinner("思考中..."):
             try:
-                # 发送消息
+                # 发送消息（支持文本 + 图像）
                 client.beta.threads.messages.create(
                     thread_id=st.session_state.thread_id,
                     role="user",
-                    content=prompt
+                    content=user_content
                 )
 
                 # 创建 run
