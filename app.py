@@ -2,6 +2,7 @@ import streamlit as st
 from openai import OpenAI
 import os
 import time
+import base64   # <--- 这行就是关键，加这一行就解决 NameError
 
 # 从环境变量读取
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
