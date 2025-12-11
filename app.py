@@ -53,21 +53,32 @@ if prompt or uploaded_file:
         # 显示上传的图像
         st.image(uploaded_file, caption="你上传的图表", use_column_width=True)
 
-        # 直接用 uploaded_file.getvalue() 获取字节数据（不用 open 文件）
-        bytes_data = uploaded_file.getvalue()
-        base64_image = base64.b64encode(bytes_data).decode('utf-8')
+        with st.spinner("上传图像中..."):
+            try:
+                # 步骤1: 先上传文件到 OpenAI 获取 file_id（Assistants API 标准方式）
+                file_response = client.files.create(
+                    file=uploaded_file,  # 直接传 uploaded_file 对象
+                    purpose="vision"  # 指定为 Vision 用途
+                )
+                file_id = file_response.id
 
-        # 添加图像到消息（用 image_url + base64）
-        user_content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:{uploaded_file.type};base64,{base64_image}"
-            }
-        })
+                # 步骤2: 用 file_id 引用图像
+                user_content.append({
+                    "type": "image_file",
+                    "image_file": {
+                        "file_id": file_id  # 用 file_id 而不是 base64
+                    }
+                })
 
-        # 自动提示
-        if not prompt:
-            prompt = "分析这张上传的图表截图，用我的密集型资金攻略解释 P1/P2/V7/V10 和资金标签"
+                # 自动提示
+                if not prompt:
+                    prompt = "分析这张上传的图表截图，用我的密集型资金攻略解释 P1/P2/V7/V10 和资金标签"
+
+                st.success(f"图像上传成功！file_id: {file_id}")
+
+            except Exception as e:
+                st.error(f"上传失败：{str(e)}")
+                st.stop()
 
     # 添加用户消息到历史
     st.session_state.messages.append({"role": "user", "content": prompt or "（上传了图表截图）"})
@@ -82,7 +93,7 @@ if prompt or uploaded_file:
         message_placeholder = st.empty()
         with st.spinner("思考中..."):
             try:
-                # 发送消息
+                # 发送消息（文本 + 图像 file_id）
                 client.beta.threads.messages.create(
                     thread_id=st.session_state.thread_id,
                     role="user",
